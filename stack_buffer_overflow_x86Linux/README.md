@@ -39,8 +39,9 @@ I will link the Asembly Module later.
 + __Little endian:__ lowest valence -> low address 
 
 - Example:
-+ Word : \xAA\xBB\xCC\xDD 
-+ Address: 0xffff0000
++ **Word:** ` \xAA\xBB\xCC\xDD`
++ **Address:**  `0xffff0000`
+
 | Memory address | 0xffff0000 | 0xffff0001 | 0xffff0002 | 0xffff0003 |
 |:---:|:---:|:---:|:---:|:---:|
 | Big endian | AA | BB | CC | DD |
