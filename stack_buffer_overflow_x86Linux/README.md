@@ -41,10 +41,10 @@ I will link the Asembly Module later.
 - Example:
 + Word : \xAA\xBB\xCC\xDD 
 + Address: 0xffff0000
-| Mem address 	| 0xffff0000 	| 0xffff0001 	| 0xffff0002 	| 0xffff0003 	|
-|-------------	|------------	|------------	|------------	|------------	|
-| Big endian  	|     AA     	|     BB     	|     CC     	|     DD     	|
-| Lil endian  	|     DD     	|     CC     	|     BB     	|     AA     	|
+| Memory address | 0xffff0000 | 0xffff0001 | 0xffff0002 | 0xffff0003 |
+|:---:|:---:|:---:|:---:|:---:|
+| Big endian | AA | BB | CC | DD |
+| Lil endian | DD | CC | BB | AA |
 
 # Take control of EIP 
 
