@@ -39,14 +39,14 @@ I will link the Asembly Module later.
 + __Little endian:__ lowest valence -> low address 
 
 - Example:
-word: \xAA\xBB\xCC\xDD 
-addr: 0xffff0000
-| Mem address | 0xffff0000 | 0xffff0001 | 0xffff0002 | 0xffff0003 |
-|:------------|:----------:|:----------:|:----------:|-----------:|
-| Big endian  |     AA     |     BB     |     CC     |      DD    |
-| Lil endian  |     DD     |     CC     |     BB     |      AA    |
+Word: \xAA\xBB\xCC\xDD 
+Address: 0xffff0000
+| Mem address 	| 0xffff0000 	| 0xffff0001 	| 0xffff0002 	| 0xffff0003 	|
+|-------------	|------------	|------------	|------------	|------------	|
+| Big endian  	|     AA     	|     BB     	|     CC     	|     DD     	|
+| Lil endian  	|     DD     	|     CC     	|     BB     	|     AA     	|
 
-#Take control of EIP 
+# Take control of EIP 
 
 
 
