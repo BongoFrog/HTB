@@ -92,6 +92,6 @@ Brick by brick, we check calculate buffer and check bad character from CHARS.
 After finding all bad characters that can infect the shellcode , just generate the payload with msf-tools, recalculate the buffer
 
 # Identification of the Return Address
-Now with `EIP`, we have to change the 0x66666666 into the address inside NOPS area, so that each cycle, its goes up (since the EIP autopilot increase value) until meet our shellcode. Without `DEP`, we `EIP` will execute the shellcode we inject.
+Now with `EIP`, we have to change the 0x66666666 into the address inside NOPS area, so that each cycle, its goes up (since the EIP autopilot increase value) until meet our shellcode. Without `DEP`, we `EIP` will execute the shellcode we inject. Just reminder, use little endian, so the address in gdb have to be modified a lil bit.
 
 
