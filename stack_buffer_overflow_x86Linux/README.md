@@ -38,6 +38,7 @@ I will link the Asembly Module later.
 + __Big endian:__ highest valence -> low address 
 + __Little endian:__ lowest valence -> low address 
 
+
 - Example:
 + Word: \xAA\xBB\xCC\xDD 
 + Address: 0xffff0000
